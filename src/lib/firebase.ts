@@ -123,8 +123,19 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 
     const data = snapshot.val()
     const entries: LeaderboardEntry[] = Object.values(data)
-    entries.sort((a, b) => b.score - a.score)
-    return entries.slice(0, 5)
+
+    // Deduplicate: keep only the highest score per name
+    const best = new Map<string, LeaderboardEntry>()
+    for (const entry of entries) {
+      const existing = best.get(entry.name)
+      if (!existing || entry.score > existing.score) {
+        best.set(entry.name, entry)
+      }
+    }
+
+    return Array.from(best.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
   } catch (err) {
     console.error('Error fetching leaderboard:', err)
     return []

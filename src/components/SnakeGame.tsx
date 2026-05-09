@@ -43,14 +43,16 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [justEnteredLB, setJustEnteredLB] = useState(false)
   const [loadingLB, setLoadingLB] = useState(true)
+  const [displayMode, setDisplayMode] = useState<GameMode>('classic')
 
-  // Load leaderboard from Firebase on mount
+  // Load leaderboard from Firebase on mount and when mode changes
   useEffect(() => {
-    fetchLeaderboard().then((data) => {
+    setLoadingLB(true)
+    fetchLeaderboard(displayMode).then((data) => {
       setLeaderboard(data)
       setLoadingLB(false)
     })
-  }, [])
+  }, [displayMode])
 
   // Game state (ref to avoid re-render in game loop)
   const stateRef = useRef({
@@ -169,9 +171,9 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
     const st = stateRef.current
     if (!playerName || st.score <= 0) return
 
-    submitScoreRTDB(playerName, st.score).then((updated) => {
+    submitScoreRTDB(playerName, st.score, st.mode).then((updated) => {
       setLeaderboard(updated)
-      const entered = updated.some(e => e.name === playerName && e.score === st.score)
+      const entered = updated.some(e => e.name === playerName && e.score === st.score && e.mode === st.mode)
       setJustEnteredLB(entered)
     })
   }, [playerName])
@@ -265,6 +267,7 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
     st.mode = m
     st.food = randomCell(st.snake)
     setJustEnteredLB(false)
+    setDisplayMode(m)
     rerender(); draw()
   }, [rerender, draw])
 
@@ -389,6 +392,11 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
           ><span className="mode-icon">✨</span> Immortal</button>
         </div>
 
+        {/* Mode label on leaderboard */}
+        <div className="mode-label">
+          {mode === 'classic' ? '🎯 Mortal' : '✨ Immortal'}
+        </div>
+
         {/* Player + Leaderboard */}
         <div className="lobby-panel">
           <div className="player-info">
@@ -398,7 +406,7 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
           <div className="leaderboard">
             <div className="leaderboard-header">
               <span className="leaderboard-icon">🏆</span>
-              <span>Leaderboard</span>
+              <span>Leaderboard {mode === 'classic' ? '(Mortal)' : '(Immortal)'}</span>
             </div>
             {loadingLB ? (
               <p className="leaderboard-empty">Loading...</p>
@@ -500,17 +508,26 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
             </div>
           )}
 
-          <div className="mobile-controls-hint">
-            <div className="arrow-row">
-              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }} onClick={() => setDirection('UP')}>▲</button>
+        </div>
+
+        {/* ── Mobile D-Pad (outside map) ── */}
+        <div className="mobile-controls">
+          <div className="dpad">
+            <button className="dpad-btn dpad-up" onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }} onClick={() => setDirection('UP')}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+            <button className="dpad-btn dpad-left" onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }} onClick={() => setDirection('LEFT')}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div className="dpad-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3"><circle cx="12" cy="12" r="1"/></svg>
             </div>
-            <div className="arrow-row">
-              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }} onClick={() => setDirection('LEFT')}>◀</button>
-              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }} onClick={() => setDirection('RIGHT')}>▶</button>
-            </div>
-            <div className="arrow-row">
-              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }} onClick={() => setDirection('DOWN')}>▼</button>
-            </div>
+            <button className="dpad-btn dpad-right" onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }} onClick={() => setDirection('RIGHT')}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button className="dpad-btn dpad-down" onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }} onClick={() => setDirection('DOWN')}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
           </div>
         </div>
       </main>

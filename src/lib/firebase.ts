@@ -32,6 +32,7 @@ export type LeaderboardEntry = {
   name: string
   score: number
   date: string
+  mode: 'classic' | 'immortal'
 }
 
 const LEADERBOARD_PATH = 'leaderboard'
@@ -113,16 +114,21 @@ export function onPresenceChange(cb: (users: OnlineUser[]) => void) {
 
 // ── Leaderboard ──────────────────────────────────────────────────────────────
 /**
- * Fetch top 5 leaderboard entries from Realtime Database.
+ * Fetch top 5 leaderboard entries from Realtime Database, optionally filtered by mode.
  */
-export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+export async function fetchLeaderboard(mode?: 'classic' | 'immortal'): Promise<LeaderboardEntry[]> {
   try {
     const leaderboardRef = ref(db, LEADERBOARD_PATH)
     const snapshot = await get(leaderboardRef)
     if (!snapshot.exists()) return []
 
     const data = snapshot.val()
-    const entries: LeaderboardEntry[] = Object.values(data)
+    let entries: LeaderboardEntry[] = Object.values(data)
+
+    // Filter by mode if specified
+    if (mode) {
+      entries = entries.filter(e => e.mode === mode)
+    }
 
     // Deduplicate: keep only the highest score per name
     const best = new Map<string, LeaderboardEntry>()
@@ -145,8 +151,8 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 /**
  * Submit a score to the Realtime Database.
  */
-export async function submitScoreRTDB(name: string, score: number): Promise<LeaderboardEntry[]> {
-  if (score <= 0) return fetchLeaderboard()
+export async function submitScoreRTDB(name: string, score: number, mode: 'classic' | 'immortal' = 'classic'): Promise<LeaderboardEntry[]> {
+  if (score <= 0) return fetchLeaderboard(mode)
 
   try {
     const leaderboardRef = ref(db, LEADERBOARD_PATH)
@@ -154,12 +160,13 @@ export async function submitScoreRTDB(name: string, score: number): Promise<Lead
       name,
       score,
       date: new Date().toISOString().slice(0, 10),
+      mode,
     }
     await push(leaderboardRef, newEntry)
 
-    return fetchLeaderboard()
+    return fetchLeaderboard(mode)
   } catch (err) {
     console.error('Error submitting score:', err)
-    return fetchLeaderboard()
+    return fetchLeaderboard(mode)
   }
 }

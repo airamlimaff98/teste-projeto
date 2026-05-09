@@ -491,9 +491,9 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 4px;
-  width: 156px;
-  height: 156px;
+  gap: 10px;
+  width: 210px;
+  height: 210px;
 }
 
 .dpad-btn {
@@ -503,7 +503,7 @@
   width: 100%;
   height: 100%;
   border: none;
-  border-radius: 14px;
+  border-radius: 18px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
@@ -571,7 +571,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.04);
-  border-radius: 14px;
+  border-radius: 18px;
   color: rgba(255, 255, 255, 0.3);
   pointer-events: none;
 }

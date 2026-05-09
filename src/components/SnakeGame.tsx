@@ -5,6 +5,7 @@ import './SnakeGame.css'
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'
 type Cell = { x: number; y: number }
 type GameStatus = 'idle' | 'playing' | 'paused' | 'gameover'
+type GameMode = 'classic' | 'immortal'
 
 const GRID_SIZE = 20
 const INITIAL_SPEED = 150 // ms per tick
@@ -51,7 +52,9 @@ export default function SnakeGame() {
     nextDirection: 'RIGHT' as Direction,
     score: 0,
     highScore: Number(localStorage.getItem('snake-high-score') ?? '0'),
+    highScoreImmortal: Number(localStorage.getItem('snake-high-score-immortal') ?? '0'),
     status: 'idle' as GameStatus,
+    mode: 'classic' as GameMode,
     speed: INITIAL_SPEED,
     tickId: null as number | null,
   })
@@ -71,7 +74,7 @@ export default function SnakeGame() {
     if (!ctx) return
 
     const s = CELL_SIZE.current
-    const { snake, food } = stateRef.current
+    const { snake, food, mode } = stateRef.current
     const w = canvas.width
     const h = canvas.height
 
@@ -99,16 +102,20 @@ export default function SnakeGame() {
     const fx = food.x * s + s / 2
     const fy = food.y * s + s / 2
     const fr = s * 0.4
+
+    const foodColor1 = mode === 'immortal' ? '#fbbf24' : '#ff6bcb'
+    const foodColor2 = mode === 'immortal' ? '#f59e0b' : '#ff3ea5'
+
     const grad = ctx.createRadialGradient(fx - fr * 0.3, fy - fr * 0.3, 0, fx, fy, fr * 1.6)
-    grad.addColorStop(0, '#ff6bcb')
-    grad.addColorStop(0.5, '#ff3ea5')
-    grad.addColorStop(1, 'rgba(255,62,165,0)')
+    grad.addColorStop(0, foodColor1)
+    grad.addColorStop(0.5, foodColor2)
+    grad.addColorStop(1, `${foodColor2}00`)
     ctx.fillStyle = grad
     ctx.beginPath()
     ctx.arc(fx, fy, fr * 1.6, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.fillStyle = '#ff6bcb'
+    ctx.fillStyle = foodColor1
     ctx.beginPath()
     ctx.arc(fx, fy, fr, 0, Math.PI * 2)
     ctx.fill()
@@ -127,10 +134,17 @@ export default function SnakeGame() {
       const radius = Math.min(size / 2, 4)
 
       const t = i / Math.max(snake.length - 1, 1)
-      // Gradient from head (cyan) to tail (purple)
-      const r = Math.round(10 + t * (120 - 10))
-      const g = Math.round(220 - t * (220 - 40))
-      const b = Math.round(200 - t * (200 - 255))
+
+      let r: number, g: number, b: number
+      if (mode === 'immortal') {
+        r = Math.round(250 - t * (250 - 180))
+        g = Math.round(200 - t * (200 - 80))
+        b = Math.round(50 - t * 50)
+      } else {
+        r = Math.round(10 + t * (120 - 10))
+        g = Math.round(220 - t * (220 - 40))
+        b = Math.round(200 - t * (200 - 255))
+      }
       ctx.fillStyle = `rgb(${r},${g},${b})`
 
       // Rounded rect
@@ -149,7 +163,9 @@ export default function SnakeGame() {
 
       // Head glow
       if (i === 0) {
-        ctx.shadowColor = 'rgba(10,220,200,0.4)'
+        ctx.shadowColor = mode === 'immortal'
+          ? 'rgba(251,191,36,0.4)'
+          : 'rgba(10,220,200,0.4)'
         ctx.shadowBlur = 12
         ctx.fill()
         ctx.shadowBlur = 0
@@ -229,8 +245,8 @@ export default function SnakeGame() {
     if (head.y < 0) head.y = GRID_SIZE - 1
     if (head.y >= GRID_SIZE) head.y = 0
 
-    // Self-collision
-    if (st.snake.some((c) => c.x === head.x && c.y === head.y)) {
+    // Self-collision (only in classic mode)
+    if (st.mode === 'classic' && st.snake.some((c) => c.x === head.x && c.y === head.y)) {
       st.status = 'gameover'
       if (st.score > st.highScore) {
         st.highScore = st.score
@@ -248,6 +264,15 @@ export default function SnakeGame() {
       st.score += 10
       st.speed = Math.max(MIN_SPEED, st.speed - SPEED_INCREMENT)
       st.food = randomCell(st.snake)
+
+      // In immortal mode, auto-save high score continuously
+      if (st.mode === 'immortal') {
+        const key = 'snake-high-score-immortal'
+        if (st.score > st.highScoreImmortal) {
+          st.highScoreImmortal = st.score
+          localStorage.setItem(key, String(st.score))
+        }
+      }
     } else {
       st.snake.pop()
     }
@@ -297,6 +322,15 @@ export default function SnakeGame() {
     st.status = 'paused'
     rerender()
   }, [rerender])
+
+  const setMode = useCallback((mode: GameMode) => {
+    const st = stateRef.current
+    if (st.status === 'playing' || st.status === 'paused') return
+    st.mode = mode
+    st.food = randomCell(st.snake)
+    rerender()
+    draw()
+  }, [rerender, draw])
 
   // ── Controls ───────────────────────────────────────────────────────────────
   const handleKey = useCallback(
@@ -414,7 +448,8 @@ export default function SnakeGame() {
   )
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const { status, score, highScore } = stateRef.current
+  const { status, score, mode, highScore, highScoreImmortal } = stateRef.current
+  const currentHighScore = mode === 'immortal' ? highScoreImmortal : highScore
 
   return (
     <div className="snake-game-wrapper">
@@ -428,11 +463,31 @@ export default function SnakeGame() {
             <span className="score-label">SCORE</span>
             <span className="score-value">{String(score).padStart(4, '0')}</span>
           </div>
-          <div className="score-box score-box--high">
+          <div className={`score-box score-box--high ${mode === 'immortal' ? 'score-box--gold' : ''}`}>
             <span className="score-label">BEST</span>
-            <span className="score-value">{String(highScore).padStart(4, '0')}</span>
+            <span className="score-value">{String(currentHighScore).padStart(4, '0')}</span>
           </div>
         </div>
+      </div>
+
+      {/* Mode selector */}
+      <div className="mode-selector">
+        <button
+          className={`mode-btn ${mode === 'classic' ? 'mode-btn--active' : ''}`}
+          onClick={() => setMode('classic')}
+          disabled={status === 'playing' || status === 'paused'}
+        >
+          <span className="mode-icon">🎯</span>
+          Classic
+        </button>
+        <button
+          className={`mode-btn ${mode === 'immortal' ? 'mode-btn--active' : ''}`}
+          onClick={() => setMode('immortal')}
+          disabled={status === 'playing' || status === 'paused'}
+        >
+          <span className="mode-icon">✨</span>
+          Immortal
+        </button>
       </div>
 
       <div
@@ -443,6 +498,11 @@ export default function SnakeGame() {
       >
         <canvas ref={canvasRef} className="snake-canvas" />
 
+        {/* Mode badge */}
+        {mode === 'immortal' && status === 'playing' && (
+          <div className="mode-badge">✨ Immortal</div>
+        )}
+
         {/* Overlays */}
         {status === 'idle' && (
           <div className="snake-overlay">
@@ -450,6 +510,10 @@ export default function SnakeGame() {
               <span className="overlay-icon">🐍</span>
               <h2>Snake Game</h2>
               <p>Use arrow keys or WASD to move</p>
+              <p className="overlay-mode-info">
+                Mode: <strong>{mode === 'classic' ? '🎯 Classic' : '✨ Immortal'}</strong>
+                {mode === 'immortal' && <span className="mode-desc"> — you can't die!</span>}
+              </p>
               <p className="overlay-hint">Press <kbd>Space</kbd> or tap to start</p>
               <button className="snake-btn" onClick={startGame}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -485,7 +549,7 @@ export default function SnakeGame() {
                 <span>Score</span>
                 <strong>{score}</strong>
               </div>
-              {score >= highScore && score > 0 && (
+              {score >= currentHighScore && score > 0 && (
                 <p className="new-record">🎉 New Record!</p>
               )}
               <p className="overlay-hint">Press <kbd>Space</kbd> or tap to restart</p>

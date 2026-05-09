@@ -356,45 +356,45 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
 
   return (
     <div className="snake-game-wrapper">
-      <div className="snake-header">
-        <div className="snake-title">
-          <span className="snake-icon">🐍</span>
-          <h1>SNAKE</h1>
-        </div>
-        <div className="snake-scores">
-          <div className="score-box">
-            <span className="score-label">SCORE</span>
-            <span className="score-value">{String(score).padStart(4, '0')}</span>
+      {/* ── Sidebar ── */}
+      <aside className="snake-sidebar">
+        <div className="snake-header">
+          <div className="snake-title">
+            <span className="snake-icon">🐍</span>
+            <h1>SNAKE</h1>
           </div>
-          <div className={`score-box score-box--high ${mode === 'immortal' ? 'score-box--gold' : ''}`}>
-            <span className="score-label">BEST</span>
-            <span className="score-value">{String(currentHighScore).padStart(4, '0')}</span>
+          <div className="snake-scores">
+            <div className="score-box">
+              <span className="score-label">SCORE</span>
+              <span className="score-value">{String(score).padStart(4, '0')}</span>
+            </div>
+            <div className={`score-box score-box--high ${mode === 'immortal' ? 'score-box--gold' : ''}`}>
+              <span className="score-label">BEST</span>
+              <span className="score-value">{String(currentHighScore).padStart(4, '0')}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Mode selector */}
-      <div className="mode-selector">
-        <button
-          className={`mode-btn ${mode === 'classic' ? 'mode-btn--active' : ''}`}
-          onClick={() => setMode('classic')}
-          disabled={status === 'playing' || status === 'paused'}
-        ><span className="mode-icon">🎯</span> Classic</button>
-        <button
-          className={`mode-btn ${mode === 'immortal' ? 'mode-btn--active' : ''}`}
-          onClick={() => setMode('immortal')}
-          disabled={status === 'playing' || status === 'paused'}
-        ><span className="mode-icon">✨</span> Immortal</button>
-      </div>
+        {/* Mode selector */}
+        <div className="mode-selector">
+          <button
+            className={`mode-btn ${mode === 'classic' ? 'mode-btn--active' : ''}`}
+            onClick={() => setMode('classic')}
+            disabled={status === 'playing' || status === 'paused'}
+          ><span className="mode-icon">🎯</span> Classic</button>
+          <button
+            className={`mode-btn ${mode === 'immortal' ? 'mode-btn--active' : ''}`}
+            onClick={() => setMode('immortal')}
+            disabled={status === 'playing' || status === 'paused'}
+          ><span className="mode-icon">✨</span> Immortal</button>
+        </div>
 
-      {/* Player + Leaderboard (visible when idle/gameover) */}
-      {(status === 'idle' || status === 'gameover') && (
+        {/* Player + Leaderboard */}
         <div className="lobby-panel">
           <div className="player-info">
             <span className="player-badge">👤 {playerName}</span>
           </div>
 
-          {/* Leaderboard */}
           <div className="leaderboard">
             <div className="leaderboard-header">
               <span className="leaderboard-icon">🏆</span>
@@ -419,105 +419,101 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
             )}
           </div>
         </div>
-      )}
+      </aside>
 
-      <div
-        ref={containerRef}
-        className="snake-canvas-container"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <canvas ref={canvasRef} className="snake-canvas" />
+      {/* ── Game Area ── */}
+      <main className="snake-game-area">
+        <div
+          ref={containerRef}
+          className="snake-canvas-container"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <canvas ref={canvasRef} className="snake-canvas" />
 
-        {mode === 'immortal' && status === 'playing' && (
-          <div className="mode-badge">✨ Immortal</div>
-        )}
+          {mode === 'immortal' && status === 'playing' && (
+            <div className="mode-badge">✨ Immortal</div>
+          )}
 
-        {status === 'idle' && (
-          <div className="snake-overlay">
-            <div className="overlay-content">
-              <span className="overlay-icon">🐍</span>
-              <h2>Snake Game</h2>
-              <p>Use arrow keys or WASD to move</p>
-              <p className="overlay-mode-info">
-                Mode: <strong>{mode === 'classic' ? '🎯 Classic' : '✨ Immortal'}</strong>
-                {mode === 'immortal' && <span className="mode-desc"> — you can't die!</span>}
-              </p>
-              <p className="overlay-hint">
-                {playerName
-                  ? <>Press <kbd>Space</kbd> or tap to start</>
-                  : 'Enter your name above to start'
-                }
-              </p>
-              <button
-                className="snake-btn"
-                onClick={startGame}
-                disabled={!playerName}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5,3 19,12 5,21" />
-                </svg>
-                Start Game
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status === 'paused' && (
-          <div className="snake-overlay">
-            <div className="overlay-content">
-              <h2>Paused</h2>
-              <p className="overlay-hint">Press <kbd>Space</kbd> or tap to resume</p>
-              <button className="snake-btn" onClick={startGame}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5,3 19,12 5,21" />
-                </svg>
-                Resume
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status === 'gameover' && (
-          <div className="snake-overlay">
-            <div className="overlay-content">
-              <span className="overlay-icon">💀</span>
-              <h2>Game Over</h2>
-              <div className="final-score">
-                <span>Score</span>
-                <strong>{score}</strong>
+          {status === 'idle' && (
+            <div className="snake-overlay">
+              <div className="overlay-content">
+                <span className="overlay-icon">🐍</span>
+                <h2>Snake Game</h2>
+                <p>Use arrow keys or WASD to move</p>
+                <p className="overlay-mode-info">
+                  Mode: <strong>{mode === 'classic' ? '🎯 Classic' : '✨ Immortal'}</strong>
+                  {mode === 'immortal' && <span className="mode-desc"> — you can't die!</span>}
+                </p>
+                <p className="overlay-hint">
+                  Press <kbd>Space</kbd> or tap to start
+                </p>
+                <button className="snake-btn" onClick={startGame}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                  Start Game
+                </button>
               </div>
-              {score >= currentHighScore && score > 0 && (
-                <p className="new-record">🎉 New Record!</p>
-              )}
-              {justEnteredLB && (
-                <p className="new-record leaderboard-entry-msg">🏆 Entered the leaderboard!</p>
-              )}
-              <p className="overlay-hint">Press <kbd>Space</kbd> or tap to restart</p>
-              <button className="snake-btn" onClick={startGame}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10" />
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                </svg>
-                Play Again
-              </button>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="mobile-controls-hint">
-          <div className="arrow-row">
-            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }} onClick={() => setDirection('UP')}>▲</button>
-          </div>
-          <div className="arrow-row">
-            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }} onClick={() => setDirection('LEFT')}>◀</button>
-            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }} onClick={() => setDirection('RIGHT')}>▶</button>
-          </div>
-          <div className="arrow-row">
-            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }} onClick={() => setDirection('DOWN')}>▼</button>
+          {status === 'paused' && (
+            <div className="snake-overlay">
+              <div className="overlay-content">
+                <h2>Paused</h2>
+                <p className="overlay-hint">Press <kbd>Space</kbd> or tap to resume</p>
+                <button className="snake-btn" onClick={startGame}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                  Resume
+                </button>
+              </div>
+            </div>
+          )}
+
+          {status === 'gameover' && (
+            <div className="snake-overlay">
+              <div className="overlay-content">
+                <span className="overlay-icon">💀</span>
+                <h2>Game Over</h2>
+                <div className="final-score">
+                  <span>Score</span>
+                  <strong>{score}</strong>
+                </div>
+                {score >= currentHighScore && score > 0 && (
+                  <p className="new-record">🎉 New Record!</p>
+                )}
+                {justEnteredLB && (
+                  <p className="new-record leaderboard-entry-msg">🏆 Entered the leaderboard!</p>
+                )}
+                <p className="overlay-hint">Press <kbd>Space</kbd> or tap to restart</p>
+                <button className="snake-btn" onClick={startGame}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="mobile-controls-hint">
+            <div className="arrow-row">
+              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }} onClick={() => setDirection('UP')}>▲</button>
+            </div>
+            <div className="arrow-row">
+              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }} onClick={() => setDirection('LEFT')}>◀</button>
+              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }} onClick={() => setDirection('RIGHT')}>▶</button>
+            </div>
+            <div className="arrow-row">
+              <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }} onClick={() => setDirection('DOWN')}>▼</button>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 

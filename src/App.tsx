@@ -23,11 +23,7 @@ function App() {
     const unsub = onAuthChange((u) => {
       setUser(u)
       setLoading(false)
-
-      if (u) {
-        // Track this user as online
-        trackPresence(u)
-      }
+      if (u) trackPresence(u)
     })
     return () => {
       unsub()
@@ -37,21 +33,9 @@ function App() {
 
   // Listen to presence when authenticated
   useEffect(() => {
-    if (!user) {
-      setOnlineUsers([])
-      return
-    }
-    const unsub = onPresenceChange((users) => {
-      setOnlineUsers(users)
-    })
+    if (!user) { setOnlineUsers([]); return }
+    const unsub = onPresenceChange((users) => setOnlineUsers(users))
     return unsub
-  }, [user])
-
-  // Cleanup presence on unmount
-  useEffect(() => {
-    return () => {
-      if (user) untrackPresence(user)
-    }
   }, [user])
 
   const handleLogout = async () => {
@@ -67,26 +51,20 @@ function App() {
     )
   }
 
-  if (!user) {
-    return <AuthScreen />
-  }
+  if (!user) return <AuthScreen />
 
   return (
     <div className="app-snake">
       <div className="app-topbar">
         <div className="app-topbar-left">
           <span className="app-user">👤 {user.displayName || user.email}</span>
-          <button
-            className="app-online-toggle"
-            onClick={() => setShowOnline((v) => !v)}
-          >
+          <button className="app-online-toggle" onClick={() => setShowOnline((v) => !v)}>
             🟢 {onlineUsers.length}
           </button>
         </div>
         <button className="app-logout" onClick={handleLogout}>Sign out</button>
       </div>
 
-      {/* Online users panel */}
       {showOnline && (
         <div className="online-panel">
           <div className="online-header">
@@ -94,16 +72,15 @@ function App() {
             <button className="online-close" onClick={() => setShowOnline(false)}>✕</button>
           </div>
           <div className="online-list">
-            {onlineUsers.length === 0 ? (
-              <p className="online-empty">No one online</p>
-            ) : (
-              onlineUsers.map((u) => (
-                <div key={u.uid} className="online-row">
-                  <span className="online-dot" />
-                  <span className="online-name">{u.name}</span>
-                </div>
-              ))
-            )}
+            {onlineUsers.length === 0
+              ? <p className="online-empty">No one online</p>
+              : onlineUsers.map((u) => (
+                  <div key={u.uid} className="online-row">
+                    <span className="online-dot" />
+                    <span className="online-name">{u.name}</span>
+                  </div>
+                ))
+            }
           </div>
         </div>
       )}

@@ -1,42 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './SnakeGame.css'
+import { fetchLeaderboard, submitScoreRTDB } from '../lib/firebase'
+import type { LeaderboardEntry } from '../lib/firebase'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'
 type Cell = { x: number; y: number }
 type GameStatus = 'idle' | 'playing' | 'paused' | 'gameover'
 type GameMode = 'classic' | 'immortal'
-type LeaderboardEntry = { name: string; score: number; date: string }
 
 const GRID_SIZE = 20
 const INITIAL_SPEED = 150
 const SPEED_INCREMENT = 3
 const MIN_SPEED = 60
-const LEADERBOARD_KEY = 'snake-leaderboard'
 const PLAYER_NAME_KEY = 'snake-player-name'
-const MAX_LEADERBOARD = 5
-
-// ─── Leaderboard utils ─────────────────────────────────────────────────────
-function loadLeaderboard(): LeaderboardEntry[] {
-  try {
-    const raw = localStorage.getItem(LEADERBOARD_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
-function saveLeaderboard(entries: LeaderboardEntry[]) {
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries))
-}
-
-function submitScore(name: string, score: number): LeaderboardEntry[] {
-  if (score <= 0) return loadLeaderboard()
-  const board = loadLeaderboard()
-  board.push({ name, score, date: new Date().toISOString().slice(0, 10) })
-  board.sort((a, b) => b.score - a.score)
-  const top = board.slice(0, MAX_LEADERBOARD)
-  saveLeaderboard(top)
-  return top
-}
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 function randomCell(snake: Cell[]): Cell {
@@ -66,8 +43,17 @@ export default function SnakeGame() {
 
   // Player name (React state for reactivity)
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? '')
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(() => loadLeaderboard())
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [justEnteredLB, setJustEnteredLB] = useState(false)
+  const [loadingLB, setLoadingLB] = useState(true)
+
+  // Load leaderboard from Firebase on mount
+  useEffect(() => {
+    fetchLeaderboard().then((data) => {
+      setLeaderboard(data)
+      setLoadingLB(false)
+    })
+  }, [])
 
   // Game state (ref to avoid re-render in game loop)
   const stateRef = useRef({
@@ -181,16 +167,16 @@ export default function SnakeGame() {
     }
   }, [])
 
-  // ── Submit score to leaderboard ────────────────────────────────────────────
+  // ── Submit score to Firebase ───────────────────────────────────────────────
   const submitCurrentScore = useCallback(() => {
     const st = stateRef.current
-    if (!playerName || st.score <= 0) return { entered: false }
-    const before = loadLeaderboard()
-    const updated = submitScore(playerName, st.score)
-    setLeaderboard(updated)
-    const entered = updated.some(e => e.name === playerName && e.score === st.score)
-    setJustEnteredLB(entered)
-    return { entered }
+    if (!playerName || st.score <= 0) return
+
+    submitScoreRTDB(playerName, st.score).then((updated) => {
+      setLeaderboard(updated)
+      const entered = updated.some(e => e.name === playerName && e.score === st.score)
+      setJustEnteredLB(entered)
+    })
   }, [playerName])
 
   // ── Game loop ──────────────────────────────────────────────────────────────
@@ -457,12 +443,14 @@ export default function SnakeGame() {
               <span className="leaderboard-icon">🏆</span>
               <span>Leaderboard</span>
             </div>
-            {leaderboard.length === 0 ? (
+            {loadingLB ? (
+              <p className="leaderboard-empty">Loading...</p>
+            ) : leaderboard.length === 0 ? (
               <p className="leaderboard-empty">No scores yet. Be the first!</p>
             ) : (
               <div className="leaderboard-list">
                 {leaderboard.map((entry, i) => (
-                  <div key={i} className={`leaderboard-row ${i === 0 ? 'rank-1' : ''} ${i === 1 ? 'rank-2' : ''} ${i === 2 ? 'rank-3' : ''}`}>
+                  <div key={`${entry.name}-${entry.score}-${i}`} className={`leaderboard-row ${i === 0 ? 'rank-1' : ''} ${i === 1 ? 'rank-2' : ''} ${i === 2 ? 'rank-3' : ''}`}>
                     <span className="rank-badge">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                     </span>

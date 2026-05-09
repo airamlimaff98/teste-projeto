@@ -171,6 +171,190 @@
 }
 
 /* ── Canvas ────────────────────────────────────────────────────────────────── */
+/* ── Player Name ──────────────────────────────────────────────────────────── */
+.lobby-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.name-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+}
+
+.name-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.name-input {
+  flex: 1;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.name-input:focus {
+  border-color: rgba(10, 220, 200, 0.4);
+}
+
+.name-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.snake-btn--sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.player-badge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.change-name-btn {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.change-name-btn:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Leaderboard ──────────────────────────────────────────────────────────── */
+.leaderboard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.leaderboard-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.leaderboard-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.leaderboard-empty {
+  text-align: center;
+  font-size: 0.75rem !important;
+  color: rgba(255, 255, 255, 0.3) !important;
+  padding: 0.5rem 0;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.15s;
+}
+
+.leaderboard-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rank-1 {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.rank-2 {
+  background: rgba(168, 168, 180, 0.06);
+}
+
+.rank-3 {
+  background: rgba(205, 127, 50, 0.06);
+}
+
+.rank-badge {
+  width: 1.8rem;
+  font-size: 0.85rem;
+  text-align: center;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.rank-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.leaderboard-entry-msg {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* ── Canvas ────────────────────────────────────────────────────────────────── */
 .snake-canvas-container {
   position: relative;
   width: 100%;

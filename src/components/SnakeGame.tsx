@@ -6,11 +6,37 @@ type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'
 type Cell = { x: number; y: number }
 type GameStatus = 'idle' | 'playing' | 'paused' | 'gameover'
 type GameMode = 'classic' | 'immortal'
+type LeaderboardEntry = { name: string; score: number; date: string }
 
 const GRID_SIZE = 20
-const INITIAL_SPEED = 150 // ms per tick
-const SPEED_INCREMENT = 3 // ms faster per food eaten
+const INITIAL_SPEED = 150
+const SPEED_INCREMENT = 3
 const MIN_SPEED = 60
+const LEADERBOARD_KEY = 'snake-leaderboard'
+const PLAYER_NAME_KEY = 'snake-player-name'
+const MAX_LEADERBOARD = 5
+
+// ─── Leaderboard utils ─────────────────────────────────────────────────────
+function loadLeaderboard(): LeaderboardEntry[] {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveLeaderboard(entries: LeaderboardEntry[]) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries))
+}
+
+function submitScore(name: string, score: number): LeaderboardEntry[] {
+  if (score <= 0) return loadLeaderboard()
+  const board = loadLeaderboard()
+  board.push({ name, score, date: new Date().toISOString().slice(0, 10) })
+  board.sort((a, b) => b.score - a.score)
+  const top = board.slice(0, MAX_LEADERBOARD)
+  saveLeaderboard(top)
+  return top
+}
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 function randomCell(snake: Cell[]): Cell {
@@ -27,10 +53,7 @@ function randomCell(snake: Cell[]): Cell {
 
 function opposite(dir: Direction): Direction {
   const map: Record<Direction, Direction> = {
-    UP: 'DOWN',
-    DOWN: 'UP',
-    LEFT: 'RIGHT',
-    RIGHT: 'LEFT',
+    UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT',
   }
   return map[dir]
 }
@@ -39,8 +62,14 @@ function opposite(dir: Direction): Direction {
 export default function SnakeGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
-  // Game state (persisted across re-renders for the game loop)
+  // Player name (React state for reactivity)
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? '')
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(() => loadLeaderboard())
+  const [justEnteredLB, setJustEnteredLB] = useState(false)
+
+  // Game state (ref to avoid re-render in game loop)
   const stateRef = useRef({
     snake: [
       { x: 10, y: 10 },
@@ -59,11 +88,9 @@ export default function SnakeGame() {
     tickId: null as number | null,
   })
 
-  // Re-render trigger
   const [, forceRender] = useState(0)
   const rerender = useCallback(() => forceRender((n) => n + 1), [])
 
-  // ── Canvas cell size ─────────────────────────────────────────────────────
   const CELL_SIZE = useRef(20)
 
   // ── Drawing ────────────────────────────────────────────────────────────────
@@ -78,180 +105,122 @@ export default function SnakeGame() {
     const w = canvas.width
     const h = canvas.height
 
-    // Background
     ctx.fillStyle = '#0f0f13'
     ctx.fillRect(0, 0, w, h)
 
-    // Subtle grid
     ctx.strokeStyle = 'rgba(255,255,255,0.03)'
     ctx.lineWidth = 0.5
     for (let x = 0; x <= GRID_SIZE; x++) {
-      ctx.beginPath()
-      ctx.moveTo(x * s, 0)
-      ctx.lineTo(x * s, h)
-      ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x * s, 0); ctx.lineTo(x * s, h); ctx.stroke()
     }
     for (let y = 0; y <= GRID_SIZE; y++) {
-      ctx.beginPath()
-      ctx.moveTo(0, y * s)
-      ctx.lineTo(w, y * s)
-      ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0, y * s); ctx.lineTo(w, y * s); ctx.stroke()
     }
 
-    // Food – glowing orb
+    // Food
     const fx = food.x * s + s / 2
     const fy = food.y * s + s / 2
     const fr = s * 0.4
-
-    const foodColor1 = mode === 'immortal' ? '#fbbf24' : '#ff6bcb'
-    const foodColor2 = mode === 'immortal' ? '#f59e0b' : '#ff3ea5'
-
-    const grad = ctx.createRadialGradient(fx - fr * 0.3, fy - fr * 0.3, 0, fx, fy, fr * 1.6)
-    grad.addColorStop(0, foodColor1)
-    grad.addColorStop(0.5, foodColor2)
-    grad.addColorStop(1, `${foodColor2}00`)
-    ctx.fillStyle = grad
-    ctx.beginPath()
-    ctx.arc(fx, fy, fr * 1.6, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.fillStyle = foodColor1
-    ctx.beginPath()
-    ctx.arc(fx, fy, fr, 0, Math.PI * 2)
-    ctx.fill()
-
-    // Inner highlight
+    const c1 = mode === 'immortal' ? '#fbbf24' : '#ff6bcb'
+    const c2 = mode === 'immortal' ? '#f59e0b' : '#ff3ea5'
+    const g = ctx.createRadialGradient(fx - fr * 0.3, fy - fr * 0.3, 0, fx, fy, fr * 1.6)
+    g.addColorStop(0, c1); g.addColorStop(0.5, c2); g.addColorStop(1, `${c2}00`)
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, fy, fr * 1.6, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill()
     ctx.fillStyle = 'rgba(255,255,255,0.5)'
-    ctx.beginPath()
-    ctx.arc(fx - fr * 0.25, fy - fr * 0.25, fr * 0.3, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.beginPath(); ctx.arc(fx - fr * 0.25, fy - fr * 0.25, fr * 0.3, 0, Math.PI * 2); ctx.fill()
 
     // Snake
     snake.forEach((cell, i) => {
-      const x = cell.x * s + 1
-      const y = cell.y * s + 1
-      const size = s - 2
-      const radius = Math.min(size / 2, 4)
-
+      const x = cell.x * s + 1, y = cell.y * s + 1, sz = s - 2, rad = Math.min(sz / 2, 4)
       const t = i / Math.max(snake.length - 1, 1)
-
       let r: number, g: number, b: number
       if (mode === 'immortal') {
-        r = Math.round(250 - t * (250 - 180))
-        g = Math.round(200 - t * (200 - 80))
-        b = Math.round(50 - t * 50)
+        r = Math.round(250 - t * 70); g = Math.round(200 - t * 120); b = Math.round(50 - t * 50)
       } else {
-        r = Math.round(10 + t * (120 - 10))
-        g = Math.round(220 - t * (220 - 40))
-        b = Math.round(200 - t * (200 - 255))
+        r = Math.round(10 + t * 110); g = Math.round(220 - t * 180); b = Math.round(200 + t * 55)
       }
       ctx.fillStyle = `rgb(${r},${g},${b})`
-
-      // Rounded rect
       ctx.beginPath()
-      ctx.moveTo(x + radius, y)
-      ctx.lineTo(x + size - radius, y)
-      ctx.quadraticCurveTo(x + size, y, x + size, y + radius)
-      ctx.lineTo(x + size, y + size - radius)
-      ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size)
-      ctx.lineTo(x + radius, y + size)
-      ctx.quadraticCurveTo(x, y + size, x, y + size - radius)
-      ctx.lineTo(x, y + radius)
-      ctx.quadraticCurveTo(x, y, x + radius, y)
-      ctx.closePath()
-      ctx.fill()
-
-      // Head glow
+      ctx.moveTo(x + rad, y); ctx.lineTo(x + sz - rad, y)
+      ctx.quadraticCurveTo(x + sz, y, x + sz, y + rad)
+      ctx.lineTo(x + sz, y + sz - rad)
+      ctx.quadraticCurveTo(x + sz, y + sz, x + sz - rad, y + sz)
+      ctx.lineTo(x + rad, y + sz)
+      ctx.quadraticCurveTo(x, y + sz, x, y + sz - rad)
+      ctx.lineTo(x, y + rad)
+      ctx.quadraticCurveTo(x, y, x + rad, y)
+      ctx.closePath(); ctx.fill()
       if (i === 0) {
-        ctx.shadowColor = mode === 'immortal'
-          ? 'rgba(251,191,36,0.4)'
-          : 'rgba(10,220,200,0.4)'
-        ctx.shadowBlur = 12
-        ctx.fill()
-        ctx.shadowBlur = 0
+        ctx.shadowColor = mode === 'immortal' ? 'rgba(251,191,36,0.4)' : 'rgba(10,220,200,0.4)'
+        ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0
       }
     })
 
-    // Eyes on head
+    // Eyes
     if (snake.length > 0) {
-      const head = snake[0]
-      const hx = head.x * s
-      const hy = head.y * s
-      const dir = stateRef.current.direction
+      const head = snake[0], hx = head.x * s, hy = head.y * s
+      const dir = stateRef.current.direction, eo = s * 0.22, es = Math.max(s * 0.12, 2)
       let ex1: number, ey1: number, ex2: number, ey2: number
-      const eyeOff = s * 0.22
-      const eyeSize = Math.max(s * 0.12, 2)
-
       if (dir === 'RIGHT' || dir === 'LEFT') {
         const sign = dir === 'RIGHT' ? 1 : -1
-        ex1 = hx + s / 2 + sign * eyeOff
-        ey1 = hy + s * 0.3
-        ex2 = hx + s / 2 + sign * eyeOff
-        ey2 = hy + s * 0.7
+        ex1 = hx + s / 2 + sign * eo; ey1 = hy + s * 0.3
+        ex2 = hx + s / 2 + sign * eo; ey2 = hy + s * 0.7
       } else {
         const sign = dir === 'DOWN' ? 1 : -1
-        ex1 = hx + s * 0.3
-        ey1 = hy + s / 2 + sign * eyeOff
-        ex2 = hx + s * 0.7
-        ey2 = hy + s / 2 + sign * eyeOff
+        ex1 = hx + s * 0.3; ey1 = hy + s / 2 + sign * eo
+        ex2 = hx + s * 0.7; ey2 = hy + s / 2 + sign * eo
       }
-
       ctx.fillStyle = '#fff'
-      ctx.beginPath()
-      ctx.arc(ex1, ey1, eyeSize, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(ex2, ey2, eyeSize, 0, Math.PI * 2)
-      ctx.fill()
-
+      ctx.beginPath(); ctx.arc(ex1, ey1, es, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(ex2, ey2, es, 0, Math.PI * 2); ctx.fill()
+      const po = dir === 'RIGHT' ? 1 : dir === 'LEFT' ? -1 : 0
       ctx.fillStyle = '#0a0a0f'
-      ctx.beginPath()
-      ctx.arc(ex1 + (dir === 'RIGHT' ? 1 : dir === 'LEFT' ? -1 : 0), ey1 + (dir === 'DOWN' ? 1 : dir === 'UP' ? -1 : 0), eyeSize * 0.5, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(ex2 + (dir === 'RIGHT' ? 1 : dir === 'LEFT' ? -1 : 0), ey2 + (dir === 'DOWN' ? 1 : dir === 'UP' ? -1 : 0), eyeSize * 0.5, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.beginPath(); ctx.arc(ex1 + po, ey1 + (dir === 'DOWN' ? 1 : dir === 'UP' ? -1 : 0), es * 0.5, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(ex2 + po, ey2 + (dir === 'DOWN' ? 1 : dir === 'UP' ? -1 : 0), es * 0.5, 0, Math.PI * 2); ctx.fill()
     }
   }, [])
+
+  // ── Submit score to leaderboard ────────────────────────────────────────────
+  const submitCurrentScore = useCallback(() => {
+    const st = stateRef.current
+    if (!playerName || st.score <= 0) return { entered: false }
+    const before = loadLeaderboard()
+    const updated = submitScore(playerName, st.score)
+    setLeaderboard(updated)
+    const entered = updated.some(e => e.name === playerName && e.score === st.score)
+    setJustEnteredLB(entered)
+    return { entered }
+  }, [playerName])
 
   // ── Game loop ──────────────────────────────────────────────────────────────
   const tick = useCallback(() => {
     const st = stateRef.current
     if (st.status !== 'playing') return
 
-    // Apply queued direction
     st.direction = st.nextDirection
 
-    // Move snake
     const head = { ...st.snake[0] }
     switch (st.direction) {
-      case 'UP':
-        head.y -= 1
-        break
-      case 'DOWN':
-        head.y += 1
-        break
-      case 'LEFT':
-        head.x -= 1
-        break
-      case 'RIGHT':
-        head.x += 1
-        break
+      case 'UP': head.y -= 1; break
+      case 'DOWN': head.y += 1; break
+      case 'LEFT': head.x -= 1; break
+      case 'RIGHT': head.x += 1; break
     }
 
-    // Wrap around
     if (head.x < 0) head.x = GRID_SIZE - 1
     if (head.x >= GRID_SIZE) head.x = 0
     if (head.y < 0) head.y = GRID_SIZE - 1
     if (head.y >= GRID_SIZE) head.y = 0
 
-    // Self-collision (only in classic mode)
+    // Self-collision (classic mode)
     if (st.mode === 'classic' && st.snake.some((c) => c.x === head.x && c.y === head.y)) {
       st.status = 'gameover'
       if (st.score > st.highScore) {
         st.highScore = st.score
         localStorage.setItem('snake-high-score', String(st.score))
       }
+      submitCurrentScore()
       rerender()
       draw()
       return
@@ -259,18 +228,19 @@ export default function SnakeGame() {
 
     st.snake.unshift(head)
 
-    // Eat food?
     if (head.x === st.food.x && head.y === st.food.y) {
       st.score += 10
       st.speed = Math.max(MIN_SPEED, st.speed - SPEED_INCREMENT)
       st.food = randomCell(st.snake)
 
-      // In immortal mode, auto-save high score continuously
       if (st.mode === 'immortal') {
-        const key = 'snake-high-score-immortal'
         if (st.score > st.highScoreImmortal) {
           st.highScoreImmortal = st.score
-          localStorage.setItem(key, String(st.score))
+          localStorage.setItem('snake-high-score-immortal', String(st.score))
+        }
+        // Periodically submit score in immortal mode
+        if (st.score % 50 === 0) {
+          submitCurrentScore()
         }
       }
     } else {
@@ -279,58 +249,54 @@ export default function SnakeGame() {
 
     draw()
     rerender()
-
-    // Schedule next tick
     st.tickId = window.setTimeout(tick, st.speed)
-  }, [draw, rerender])
+  }, [draw, rerender, submitCurrentScore])
 
   // ── Game lifecycle ─────────────────────────────────────────────────────────
   const startGame = useCallback(() => {
     const st = stateRef.current
-    // Clear old tick
-    if (st.tickId !== null) {
-      clearTimeout(st.tickId)
-      st.tickId = null
+    if (!playerName) {
+      nameInputRef.current?.focus()
+      return
     }
+    if (st.tickId !== null) { clearTimeout(st.tickId); st.tickId = null }
 
     const initialSnake: Cell[] = [
-      { x: 10, y: 10 },
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
+      { x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 },
     ]
-
     st.snake = initialSnake
     st.food = randomCell(initialSnake)
-    st.direction = 'RIGHT'
-    st.nextDirection = 'RIGHT'
-    st.score = 0
-    st.speed = INITIAL_SPEED
-    st.status = 'playing'
-
-    rerender()
-    draw()
-
+    st.direction = 'RIGHT'; st.nextDirection = 'RIGHT'
+    st.score = 0; st.speed = INITIAL_SPEED; st.status = 'playing'
+    setJustEnteredLB(false)
+    rerender(); draw()
     st.tickId = window.setTimeout(tick, st.speed)
-  }, [tick, draw, rerender])
+  }, [tick, draw, rerender, playerName])
 
   const pauseGame = useCallback(() => {
     const st = stateRef.current
-    if (st.tickId !== null) {
-      clearTimeout(st.tickId)
-      st.tickId = null
-    }
+    if (st.tickId !== null) { clearTimeout(st.tickId); st.tickId = null }
     st.status = 'paused'
     rerender()
   }, [rerender])
 
-  const setMode = useCallback((mode: GameMode) => {
+  const setMode = useCallback((m: GameMode) => {
     const st = stateRef.current
     if (st.status === 'playing' || st.status === 'paused') return
-    st.mode = mode
+    st.mode = m
     st.food = randomCell(st.snake)
-    rerender()
-    draw()
+    setJustEnteredLB(false)
+    rerender(); draw()
   }, [rerender, draw])
+
+  // ── Name handling ─────────────────────────────────────────────────────────
+  const handleNameSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    const name = nameInputRef.current?.value.trim()
+    if (!name) return
+    localStorage.setItem(PLAYER_NAME_KEY, name)
+    setPlayerName(name)
+  }, [])
 
   // ── Controls ───────────────────────────────────────────────────────────────
   const handleKey = useCallback(
@@ -339,26 +305,10 @@ export default function SnakeGame() {
       let dir: Direction | null = null
 
       switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          dir = 'UP'
-          break
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          dir = 'DOWN'
-          break
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          dir = 'LEFT'
-          break
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          dir = 'RIGHT'
-          break
+        case 'ArrowUp': case 'w': case 'W': dir = 'UP'; break
+        case 'ArrowDown': case 's': case 'S': dir = 'DOWN'; break
+        case 'ArrowLeft': case 'a': case 'A': dir = 'LEFT'; break
+        case 'ArrowRight': case 'd': case 'D': dir = 'RIGHT'; break
         case ' ':
           e.preventDefault()
           if (st.status === 'idle' || st.status === 'paused') startGame()
@@ -369,9 +319,7 @@ export default function SnakeGame() {
 
       if (dir && st.status === 'playing') {
         e.preventDefault()
-        if (dir !== opposite(st.direction)) {
-          st.nextDirection = dir
-        }
+        if (dir !== opposite(st.direction)) st.nextDirection = dir
       }
     },
     [startGame, pauseGame],
@@ -401,10 +349,7 @@ export default function SnakeGame() {
     return () => window.removeEventListener('resize', resize)
   }, [rerender, draw])
 
-  // ── Draw on mount ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    draw()
-  }, [draw])
+  useEffect(() => { draw() }, [draw])
 
   // ── Touch handling ─────────────────────────────────────────────────────────
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -419,30 +364,18 @@ export default function SnakeGame() {
       if (!touchStart.current) return
       const st = stateRef.current
       if (st.status !== 'playing') {
-        if (st.status === 'idle' || st.status === 'paused' || st.status === 'gameover') {
-          startGame()
-        }
-        touchStart.current = null
-        return
+        if (st.status === 'idle' || st.status === 'paused' || st.status === 'gameover') startGame()
+        touchStart.current = null; return
       }
-
       const t = e.changedTouches[0]
       const dx = t.clientX - touchStart.current.x
       const dy = t.clientY - touchStart.current.y
       touchStart.current = null
-
       if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return
-
-      let dir: Direction
-      if (Math.abs(dx) > Math.abs(dy)) {
-        dir = dx > 0 ? 'RIGHT' : 'LEFT'
-      } else {
-        dir = dy > 0 ? 'DOWN' : 'UP'
-      }
-
-      if (dir !== opposite(st.direction)) {
-        st.nextDirection = dir
-      }
+      const dir: Direction = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? 'RIGHT' : 'LEFT')
+        : (dy > 0 ? 'DOWN' : 'UP')
+      if (dir !== opposite(st.direction)) st.nextDirection = dir
     },
     [startGame],
   )
@@ -476,19 +409,72 @@ export default function SnakeGame() {
           className={`mode-btn ${mode === 'classic' ? 'mode-btn--active' : ''}`}
           onClick={() => setMode('classic')}
           disabled={status === 'playing' || status === 'paused'}
-        >
-          <span className="mode-icon">🎯</span>
-          Classic
-        </button>
+        ><span className="mode-icon">🎯</span> Classic</button>
         <button
           className={`mode-btn ${mode === 'immortal' ? 'mode-btn--active' : ''}`}
           onClick={() => setMode('immortal')}
           disabled={status === 'playing' || status === 'paused'}
-        >
-          <span className="mode-icon">✨</span>
-          Immortal
-        </button>
+        ><span className="mode-icon">✨</span> Immortal</button>
       </div>
+
+      {/* Player name + Leaderboard (visible when idle/gameover) */}
+      {(status === 'idle' || status === 'gameover') && (
+        <div className="lobby-panel">
+          {!playerName ? (
+            <form className="name-form" onSubmit={handleNameSubmit}>
+              <label className="name-label" htmlFor="player-name">Enter your name</label>
+              <div className="name-row">
+                <input
+                  ref={nameInputRef}
+                  id="player-name"
+                  className="name-input"
+                  type="text"
+                  placeholder="Your name..."
+                  maxLength={20}
+                  autoFocus
+                />
+                <button type="submit" className="snake-btn snake-btn--sm">
+                  Save
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="player-info">
+              <span className="player-badge">👤 {playerName}</span>
+              <button
+                className="change-name-btn"
+                onClick={() => {
+                  localStorage.removeItem(PLAYER_NAME_KEY)
+                  setPlayerName('')
+                }}
+              >Change</button>
+            </div>
+          )}
+
+          {/* Leaderboard */}
+          <div className="leaderboard">
+            <div className="leaderboard-header">
+              <span className="leaderboard-icon">🏆</span>
+              <span>Leaderboard</span>
+            </div>
+            {leaderboard.length === 0 ? (
+              <p className="leaderboard-empty">No scores yet. Be the first!</p>
+            ) : (
+              <div className="leaderboard-list">
+                {leaderboard.map((entry, i) => (
+                  <div key={i} className={`leaderboard-row ${i === 0 ? 'rank-1' : ''} ${i === 1 ? 'rank-2' : ''} ${i === 2 ? 'rank-3' : ''}`}>
+                    <span className="rank-badge">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                    </span>
+                    <span className="rank-name">{entry.name}</span>
+                    <span className="rank-score">{String(entry.score).padStart(4, '0')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         ref={containerRef}
@@ -498,12 +484,10 @@ export default function SnakeGame() {
       >
         <canvas ref={canvasRef} className="snake-canvas" />
 
-        {/* Mode badge */}
         {mode === 'immortal' && status === 'playing' && (
           <div className="mode-badge">✨ Immortal</div>
         )}
 
-        {/* Overlays */}
         {status === 'idle' && (
           <div className="snake-overlay">
             <div className="overlay-content">
@@ -514,8 +498,17 @@ export default function SnakeGame() {
                 Mode: <strong>{mode === 'classic' ? '🎯 Classic' : '✨ Immortal'}</strong>
                 {mode === 'immortal' && <span className="mode-desc"> — you can't die!</span>}
               </p>
-              <p className="overlay-hint">Press <kbd>Space</kbd> or tap to start</p>
-              <button className="snake-btn" onClick={startGame}>
+              <p className="overlay-hint">
+                {playerName
+                  ? <>Press <kbd>Space</kbd> or tap to start</>
+                  : 'Enter your name above to start'
+                }
+              </p>
+              <button
+                className="snake-btn"
+                onClick={startGame}
+                disabled={!playerName}
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5,3 19,12 5,21" />
                 </svg>
@@ -552,6 +545,9 @@ export default function SnakeGame() {
               {score >= currentHighScore && score > 0 && (
                 <p className="new-record">🎉 New Record!</p>
               )}
+              {justEnteredLB && (
+                <p className="new-record leaderboard-entry-msg">🏆 Entered the leaderboard!</p>
+              )}
               <p className="overlay-hint">Press <kbd>Space</kbd> or tap to restart</p>
               <button className="snake-btn" onClick={startGame}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -564,40 +560,22 @@ export default function SnakeGame() {
           </div>
         )}
 
-        {/* Mobile controls hint */}
         <div className="mobile-controls-hint">
           <div className="arrow-row">
-            <button
-              className="arrow-btn"
-              onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }}
-              onClick={() => setDirection('UP')}
-            >▲</button>
+            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('UP') }} onClick={() => setDirection('UP')}>▲</button>
           </div>
           <div className="arrow-row">
-            <button
-              className="arrow-btn"
-              onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }}
-              onClick={() => setDirection('LEFT')}
-            >◀</button>
-            <button
-              className="arrow-btn"
-              onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }}
-              onClick={() => setDirection('RIGHT')}
-            >▶</button>
+            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('LEFT') }} onClick={() => setDirection('LEFT')}>◀</button>
+            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('RIGHT') }} onClick={() => setDirection('RIGHT')}>▶</button>
           </div>
           <div className="arrow-row">
-            <button
-              className="arrow-btn"
-              onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }}
-              onClick={() => setDirection('DOWN')}
-            >▼</button>
+            <button className="arrow-btn" onTouchStart={(e) => { e.preventDefault(); setDirection('DOWN') }} onClick={() => setDirection('DOWN')}>▼</button>
           </div>
         </div>
       </div>
     </div>
   )
 
-  // ── Helper to set direction from d-pad ──────────────────────────────────────
   function setDirection(dir: Direction) {
     const st = stateRef.current
     if (st.status === 'playing' && dir !== opposite(st.direction)) {

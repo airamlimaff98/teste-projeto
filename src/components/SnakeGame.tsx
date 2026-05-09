@@ -60,26 +60,8 @@ export default function SnakeGame() {
   const [, forceRender] = useState(0)
   const rerender = useCallback(() => forceRender((n) => n + 1), [])
 
-  // ── Canvas resizing ────────────────────────────────────────────────────────
+  // ── Canvas cell size ─────────────────────────────────────────────────────
   const CELL_SIZE = useRef(20)
-
-  useEffect(() => {
-    const resize = () => {
-      const container = containerRef.current
-      if (!container) return
-      const size = Math.min(container.clientWidth - 32, 600)
-      CELL_SIZE.current = Math.floor(size / GRID_SIZE)
-      const canvas = canvasRef.current
-      if (canvas) {
-        canvas.width = CELL_SIZE.current * GRID_SIZE
-        canvas.height = CELL_SIZE.current * GRID_SIZE
-      }
-      draw()
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [rerender, draw])
 
   // ── Drawing ────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -277,6 +259,45 @@ export default function SnakeGame() {
     st.tickId = window.setTimeout(tick, st.speed)
   }, [draw, rerender])
 
+  // ── Game lifecycle ─────────────────────────────────────────────────────────
+  const startGame = useCallback(() => {
+    const st = stateRef.current
+    // Clear old tick
+    if (st.tickId !== null) {
+      clearTimeout(st.tickId)
+      st.tickId = null
+    }
+
+    const initialSnake: Cell[] = [
+      { x: 10, y: 10 },
+      { x: 9, y: 10 },
+      { x: 8, y: 10 },
+    ]
+
+    st.snake = initialSnake
+    st.food = randomCell(initialSnake)
+    st.direction = 'RIGHT'
+    st.nextDirection = 'RIGHT'
+    st.score = 0
+    st.speed = INITIAL_SPEED
+    st.status = 'playing'
+
+    rerender()
+    draw()
+
+    st.tickId = window.setTimeout(tick, st.speed)
+  }, [tick, draw, rerender])
+
+  const pauseGame = useCallback(() => {
+    const st = stateRef.current
+    if (st.tickId !== null) {
+      clearTimeout(st.tickId)
+      st.tickId = null
+    }
+    st.status = 'paused'
+    rerender()
+  }, [rerender])
+
   // ── Controls ───────────────────────────────────────────────────────────────
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -327,44 +348,29 @@ export default function SnakeGame() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [handleKey])
 
-  // ── Game lifecycle ─────────────────────────────────────────────────────────
-  const startGame = useCallback(() => {
-    const st = stateRef.current
-    // Clear old tick
-    if (st.tickId !== null) {
-      clearTimeout(st.tickId)
-      st.tickId = null
+  // ── Canvas resizing ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const resize = () => {
+      const container = containerRef.current
+      if (!container) return
+      const size = Math.min(container.clientWidth - 32, 600)
+      CELL_SIZE.current = Math.floor(size / GRID_SIZE)
+      const canvas = canvasRef.current
+      if (canvas) {
+        canvas.width = CELL_SIZE.current * GRID_SIZE
+        canvas.height = CELL_SIZE.current * GRID_SIZE
+      }
+      draw()
     }
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [rerender, draw])
 
-    const initialSnake: Cell[] = [
-      { x: 10, y: 10 },
-      { x: 9, y: 10 },
-      { x: 8, y: 10 },
-    ]
-
-    st.snake = initialSnake
-    st.food = randomCell(initialSnake)
-    st.direction = 'RIGHT'
-    st.nextDirection = 'RIGHT'
-    st.score = 0
-    st.speed = INITIAL_SPEED
-    st.status = 'playing'
-
-    rerender()
+  // ── Draw on mount ──────────────────────────────────────────────────────────
+  useEffect(() => {
     draw()
-
-    st.tickId = window.setTimeout(tick, st.speed)
-  }, [tick, draw, rerender])
-
-  const pauseGame = useCallback(() => {
-    const st = stateRef.current
-    if (st.tickId !== null) {
-      clearTimeout(st.tickId)
-      st.tickId = null
-    }
-    st.status = 'paused'
-    rerender()
-  }, [rerender])
+  }, [draw])
 
   // ── Touch handling ─────────────────────────────────────────────────────────
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -406,11 +412,6 @@ export default function SnakeGame() {
     },
     [startGame],
   )
-
-  // ── Draw on mount ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    draw()
-  }, [draw])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const { status, score, highScore } = stateRef.current

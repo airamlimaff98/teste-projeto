@@ -238,10 +238,6 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
   // ── Game lifecycle ─────────────────────────────────────────────────────────
   const startGame = useCallback(() => {
     const st = stateRef.current
-    if (!playerName) {
-      nameInputRef.current?.focus()
-      return
-    }
     if (st.tickId !== null) { clearTimeout(st.tickId); st.tickId = null }
 
     const initialSnake: Cell[] = [

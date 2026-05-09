@@ -10,7 +10,7 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { getDatabase, ref, get, push } from 'firebase/database'
+import { getDatabase, ref, get, push, set, remove, onValue, onDisconnect } from 'firebase/database'
 
 const firebaseConfig = {
   apiKey: "AIzaSyA1hWDQQtz1deLvzrqDUp9F4dnLUojKyik",
@@ -57,6 +57,58 @@ export async function loginGoogle() {
 
 export async function logout() {
   return signOut(auth)
+}
+
+// ── Presence (online users) ─────────────────────────────────────────────────
+export type OnlineUser = {
+  uid: string
+  name: string
+  email: string
+  onlineSince: string
+}
+
+const PRESENCE_PATH = 'presence'
+
+/**
+ * Start tracking this user's presence. Sets an onDisconnect handler
+ * so they're auto-removed if they close the tab.
+ */
+export async function trackPresence(user: User) {
+  const presenceRef = ref(db, `${PRESENCE_PATH}/${user.uid}`)
+  const data = {
+    uid: user.uid,
+    name: user.displayName || user.email?.split('@')[0] || 'Player',
+    email: user.email || '',
+    onlineSince: new Date().toISOString(),
+  }
+  await set(presenceRef, data)
+  onDisconnect(presenceRef).remove()
+}
+
+/**
+ * Remove this user's presence entry on sign out.
+ */
+export async function untrackPresence(user: User) {
+  const presenceRef = ref(db, `${PRESENCE_PATH}/${user.uid}`)
+  await remove(presenceRef)
+}
+
+/**
+ * Listen to realtime presence updates.
+ * Returns an unsubscribe function.
+ */
+export function onPresenceChange(cb: (users: OnlineUser[]) => void) {
+  const presenceRef = ref(db, PRESENCE_PATH)
+  const unsub = onValue(presenceRef, (snapshot) => {
+    if (!snapshot.exists()) {
+      cb([])
+      return
+    }
+    const data = snapshot.val()
+    const users: OnlineUser[] = Object.values(data)
+    cb(users)
+  })
+  return unsub
 }
 
 // ── Leaderboard ──────────────────────────────────────────────────────────────

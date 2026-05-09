@@ -1,5 +1,16 @@
 import { initializeApp } from 'firebase/app'
-import { getDatabase, ref, get, push, query, orderByChild, limitToLast, set } from 'firebase/database'
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  updateProfile,
+  type User,
+} from 'firebase/auth'
+import { getDatabase, ref, get, push } from 'firebase/database'
 
 const firebaseConfig = {
   apiKey: "AIzaSyA1hWDQQtz1deLvzrqDUp9F4dnLUojKyik",
@@ -14,6 +25,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const db = getDatabase(app)
+const auth = getAuth(app)
+const googleProvider = new GoogleAuthProvider()
 
 export type LeaderboardEntry = {
   name: string
@@ -23,6 +36,30 @@ export type LeaderboardEntry = {
 
 const LEADERBOARD_PATH = 'leaderboard'
 
+// ── Auth ─────────────────────────────────────────────────────────────────────
+export function onAuthChange(cb: (user: User | null) => void) {
+  return onAuthStateChanged(auth, cb)
+}
+
+export async function loginEmail(email: string, password: string) {
+  return signInWithEmailAndPassword(auth, email, password)
+}
+
+export async function signupEmail(email: string, password: string, name: string) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password)
+  await updateProfile(cred.user, { displayName: name })
+  return cred
+}
+
+export async function loginGoogle() {
+  return signInWithPopup(auth, googleProvider)
+}
+
+export async function logout() {
+  return signOut(auth)
+}
+
+// ── Leaderboard ──────────────────────────────────────────────────────────────
 /**
  * Fetch top 5 leaderboard entries from Realtime Database.
  */
@@ -33,7 +70,6 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
     if (!snapshot.exists()) return []
 
     const data = snapshot.val()
-    // data is an object keyed by push IDs: { "-Nxxx": { name, score, date }, ... }
     const entries: LeaderboardEntry[] = Object.values(data)
     entries.sort((a, b) => b.score - a.score)
     return entries.slice(0, 5)
@@ -58,7 +94,6 @@ export async function submitScoreRTDB(name: string, score: number): Promise<Lead
     }
     await push(leaderboardRef, newEntry)
 
-    // Return updated top 5
     return fetchLeaderboard()
   } catch (err) {
     console.error('Error submitting score:', err)

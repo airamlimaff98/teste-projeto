@@ -13,7 +13,6 @@ const GRID_SIZE = 20
 const INITIAL_SPEED = 150
 const SPEED_INCREMENT = 3
 const MIN_SPEED = 60
-const PLAYER_NAME_KEY = 'snake-player-name'
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 function randomCell(snake: Cell[]): Cell {
@@ -36,13 +35,11 @@ function opposite(dir: Direction): Direction {
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export default function SnakeGame() {
+export default function SnakeGame({ playerName }: { playerName: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Player name (React state for reactivity)
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? '')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [justEnteredLB, setJustEnteredLB] = useState(false)
   const [loadingLB, setLoadingLB] = useState(true)
@@ -275,15 +272,6 @@ export default function SnakeGame() {
     rerender(); draw()
   }, [rerender, draw])
 
-  // ── Name handling ─────────────────────────────────────────────────────────
-  const handleNameSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    const name = nameInputRef.current?.value.trim()
-    if (!name) return
-    localStorage.setItem(PLAYER_NAME_KEY, name)
-    setPlayerName(name)
-  }, [])
-
   // ── Controls ───────────────────────────────────────────────────────────────
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -403,39 +391,12 @@ export default function SnakeGame() {
         ><span className="mode-icon">✨</span> Immortal</button>
       </div>
 
-      {/* Player name + Leaderboard (visible when idle/gameover) */}
+      {/* Player + Leaderboard (visible when idle/gameover) */}
       {(status === 'idle' || status === 'gameover') && (
         <div className="lobby-panel">
-          {!playerName ? (
-            <form className="name-form" onSubmit={handleNameSubmit}>
-              <label className="name-label" htmlFor="player-name">Enter your name</label>
-              <div className="name-row">
-                <input
-                  ref={nameInputRef}
-                  id="player-name"
-                  className="name-input"
-                  type="text"
-                  placeholder="Your name..."
-                  maxLength={20}
-                  autoFocus
-                />
-                <button type="submit" className="snake-btn snake-btn--sm">
-                  Save
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="player-info">
-              <span className="player-badge">👤 {playerName}</span>
-              <button
-                className="change-name-btn"
-                onClick={() => {
-                  localStorage.removeItem(PLAYER_NAME_KEY)
-                  setPlayerName('')
-                }}
-              >Change</button>
-            </div>
-          )}
+          <div className="player-info">
+            <span className="player-badge">👤 {playerName}</span>
+          </div>
 
           {/* Leaderboard */}
           <div className="leaderboard">

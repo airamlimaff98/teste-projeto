@@ -91,7 +91,7 @@ export default function SnakeGame({ playerName }: { playerName: string }) {
     ctx.fillStyle = '#0f0f13'
     ctx.fillRect(0, 0, w, h)
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.lineWidth = 0.5
     for (let x = 0; x <= GRID_SIZE; x++) {
       ctx.beginPath(); ctx.moveTo(x * s, 0); ctx.lineTo(x * s, h); ctx.stroke()
